@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "gestionQR": {
+      "commandName": "Project",
+      "commandLineArgs": "-f pdf1.pdf"
+    }
+  }
+}
