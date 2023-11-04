@@ -2,7 +2,7 @@
   "profiles": {
     "gestionQR": {
       "commandName": "Project",
-      "commandLineArgs": "-f pdf1.pdf"
+      "commandLineArgs": "-f input.txt"
     }
   }
 }
