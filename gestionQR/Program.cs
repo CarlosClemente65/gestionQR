@@ -1,8 +1,10 @@
 ﻿using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Xobject;
 using System.Drawing;
-using ZXing;
-using ZXing.QrCode;
+using System.Drawing.Imaging;
+using iText.Kernel.Colors;
+using QRCoder;
+using ZXing.QrCode.Internal;
 
 internal class Program
 {
@@ -98,21 +100,58 @@ internal class Program
                         {
                             //Carga la imagen para procesarla
                             PdfStream xObjectStream = resources.GetResource(PdfName.XObject).GetAsStream(xObjectKey);
-                            PdfImageXObject imageXObject = new PdfImageXObject(xObjectStream);
-                            byte[] imageBytes = imageXObject.GetImageBytes();
 
-                            Bitmap imagenBitmap;
-                            using (MemoryStream stream = new MemoryStream(imageBytes))
+                            if (xObjectStream != null)
                             {
-                                //Convierte la imagen a bitmap
-                                imagenBitmap = new Bitmap(stream);
+                                //PdfDictionary xObjectDict = resources.GetResource(PdfName.XObject).GetAsDictionary(xObjectKey);
+                                //if (xObjectDict != null && xObjectDict.Get(PdfName.Output) != null)
+                                //{
 
-                                //Obtiene el texto del QR
-                                string textoQR = DecodificarQR(imagenBitmap);
+                                try
+                                {
+                                    //if (xObjectDict.GetAsName(PdfName.Subtype) == PdfName.Image)
+                                    //{
+                                    PdfImageXObject imageXObject = new PdfImageXObject(xObjectStream);
+                                    float ancho = imageXObject.GetWidth();
+                                    float alto = imageXObject.GetHeight();
 
-                                //Almacena el texto del QR para luego guardarlo en el fichero
-                                textoSalidaQR += $"TextoQR {idImagen}: {textoQR} \n";
+                                    byte[] imageBytes = null;
+                                    if (ancho > 0 || alto > 0)
+                                    {
+                                        imageBytes = imageXObject.GetImageBytes();
 
+                                    }
+
+                                    if (imageBytes != null)
+                                    {
+                                        using (MemoryStream stream = new MemoryStream(imageBytes))
+                                        {
+                                            //Convierte la imagen a bitmap
+                                            Bitmap imagenBitmap = new Bitmap(stream);
+
+                                            //Obtiene el texto del QR
+                                            string textoQR = DecodificarQR(imagenBitmap);
+
+                                            //Almacena el texto del QR para luego guardarlo en el fichero
+                                            textoSalidaQR += $"TextoQR {idImagen}: {textoQR} \n";
+                                        }
+                                    }
+                                    //}
+                                }
+
+                                catch (Exception ex)
+                                {
+                                    File.WriteAllText(ficheroPDF, $"Error al procesar el PDF. {ex}");
+                                }
+                                //}
+                                //else
+                                //{
+                                //    File.WriteAllText(ficheroPDF, "Error al procesar el PDF.");
+                                //}
+                            }
+                            else
+                            {
+                                File.WriteAllText(ficheroPDF, "Error al procesar el PDF.");
                             }
 
                             //Incrementa el contador de imagenes
@@ -135,23 +174,13 @@ internal class Program
             case "codificar":
                 try
                 {
-                    //Generacion de imagen con el texto introducido
-                    BarcodeWriter br = new BarcodeWriter
+                    using (QRCodeGenerator qrGenerator = new QRCodeGenerator())
+                    using (QRCodeData qrCodeData = qrGenerator.CreateQrCode(textoEntradaQR, QRCodeGenerator.ECCLevel.Q, true))
+                    using (PngByteQRCode qrCode = new PngByteQRCode(qrCodeData))
                     {
-                        //Formato del Barcode para que sea un QR (pueden ser otros como CODE128)
-                        Format = BarcodeFormat.QR_CODE,
-                        Options = new QrCodeEncodingOptions
-                        {
-                            Width = 300, // Ancho del código QR
-                            Height = 300, // Alto del código QR
-                            Margin = 2, // Margen alrededor del código QR
-                        },
-                    };
-                    //Genera una imagen QR con el texto introducido
-                    Bitmap bm = new Bitmap(br.Write(textoEntradaQR));
-                    
-                    //Guarda la imagen
-                    bm.Save("imagenQR.png");
+                        byte[] qrCodeImage = qrCode.GetGraphic(3, false);
+                        File.WriteAllBytes("imagen2.png", qrCodeImage);
+                    }
                 }
 
                 catch (Exception ex)
@@ -178,11 +207,13 @@ internal class Program
     {
         string textoQR = string.Empty;
 
-        //Instancia un lector para leer el QR
-        BarcodeReader br = new BarcodeReader();
-
-        //Decodifica el QR pasado como parametro y lo almacena en la variable textoQR
-        textoQR = br.Decode(imagenQR).ToString();
+        // Instancia un lector para leer el QR
+        var reader = new ZXing.BarcodeReader();
+        var result = reader.Decode(imagenQR);
+        if (result != null)
+        {
+            textoQR = result.Text;
+        }
 
         return textoQR;
     }
